@@ -1,3 +1,13 @@
+# Fix passlib compatibility with bcrypt 4.x
+try:
+    import bcrypt as _bcrypt_module
+    if not hasattr(_bcrypt_module, '__about__'):
+        class _FakeAbout:
+            __version__ = _bcrypt_module.__version__
+        _bcrypt_module.__about__ = _FakeAbout()
+except Exception:
+    pass
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
