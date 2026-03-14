@@ -4,17 +4,7 @@ from typing import List, Optional
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-# Fix passlib compatibility with bcrypt 4.x (must run before passlib is imported)
-try:
-    import bcrypt as _bcrypt_module
-    if not hasattr(_bcrypt_module, '__about__'):
-        class _FakeAbout:
-            __version__ = _bcrypt_module.__version__
-        _bcrypt_module.__about__ = _FakeAbout()
-except Exception:
-    pass
-
-from passlib.context import CryptContext
+import bcrypt as _bcrypt
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
@@ -27,8 +17,6 @@ settings = get_settings()
 SECRET_KEY = settings.secret_key
 ALGORITHM = settings.jwt_algorithm
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="token",
     scopes={
@@ -79,11 +67,14 @@ def has_any_role(user: User, required_roles: List[str]) -> bool:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return _bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    except Exception:
+        return False
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return _bcrypt.hashpw(password.encode('utf-8'), _bcrypt.gensalt(rounds=12)).decode('utf-8')
 
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
