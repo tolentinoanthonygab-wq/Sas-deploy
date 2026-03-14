@@ -1,4 +1,4 @@
-const API_BASE_URL = (sas-deploy-production.up.railway.app || "http://localhost:8000").replace(/\/+$/, "");
+const API_BASE_URL = (import.meta.env.VITE_API_URL|| "http://localhost:8000").replace(/\/+$/, "");
 
 const normalizePath = (path: string): string => {
   if (!path) {
