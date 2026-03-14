@@ -132,6 +132,20 @@ def seed_admin_user(db: Session, school: School):
         print(f"🔑 Admin password: {admin_password}")
         
     else:
+        # Ensure admin role exists and is assigned
+        admin_role = db.query(Role).filter(Role.name == "admin").first()
+        if admin_role:
+            existing_user_role = db.query(UserRole).filter(
+                UserRole.user_id == existing_admin.id,
+                UserRole.role_id == admin_role.id
+            ).first()
+            if not existing_user_role:
+                db.add(UserRole(user_id=existing_admin.id, role_id=admin_role.id))
+                db.commit()
+                print("✅ Admin role assigned to existing user")
+            else:
+                print("ℹ️  Admin role already assigned")
+
         updated = False
         if getattr(existing_admin, "school_id", None) is not None:
             existing_admin.school_id = None
