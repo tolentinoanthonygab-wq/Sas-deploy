@@ -4,6 +4,16 @@ from typing import List, Optional
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
+# Fix passlib compatibility with bcrypt 4.x (must run before passlib is imported)
+try:
+    import bcrypt as _bcrypt_module
+    if not hasattr(_bcrypt_module, '__about__'):
+        class _FakeAbout:
+            __version__ = _bcrypt_module.__version__
+        _bcrypt_module.__about__ = _FakeAbout()
+except Exception:
+    pass
+
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session, joinedload
 
