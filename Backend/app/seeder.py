@@ -13,9 +13,31 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def create_tables():
-    """Create all tables"""
+    """Create all tables and required types"""
+    from sqlalchemy import text
+    
+    with engine.connect() as conn:
+        # Create attendancestatus if it doesn't exist
+        conn.execute(text("""
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'attendancestatus') THEN
+                    CREATE TYPE attendancestatus AS ENUM ('present', 'late', 'absent', 'excused');
+                END IF;
+            END $$;
+        """))
+        
+        # Create eventstatus if it doesn't exist
+        conn.execute(text("""
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'eventstatus') THEN
+                    CREATE TYPE eventstatus AS ENUM ('UPCOMING', 'ONGOING', 'COMPLETED', 'CANCELLED');
+                END IF;
+            END $$;
+        """))
+        conn.commit()
+
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created")
+    print("✅ Database tables and types ensured")
 
 def seed_roles(db: Session):
     """Seed roles table with required roles"""
