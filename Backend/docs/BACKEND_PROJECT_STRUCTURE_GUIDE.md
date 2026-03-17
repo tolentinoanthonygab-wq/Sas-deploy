@@ -81,6 +81,12 @@ Backend/app/
 - legacy imports from `app.worker` still work, but new code should use `app.workers`
 - legacy Celery task names under `app.worker.tasks.*` are still registered to avoid breaking in-flight integrations during the transition
 
+## Configuration Notes
+
+- local development can use `Backend/.env` for backend settings
+- `Backend/.env` values override process env vars when present
+- Alembic reads the same `Backend/.env` for `DATABASE_URL` when present
+
 ## How To Test
 
 1. Run `python -m compileall Backend/app`.

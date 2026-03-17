@@ -14,6 +14,41 @@ At minimum include:
 - route or schema changes
 - migration or configuration impact
 
+## 2026-03-17 - Load Backend/.env for app and Alembic
+
+### Purpose
+
+Let local development use a single `Backend/.env` file without exporting shell variables for the app, seeder, or Alembic.
+
+### Main files
+
+- `Backend/app/core/config.py`
+- `Backend/alembic/env.py`
+- `Backend/.env`
+- `Backend/docs/BACKEND_PROJECT_STRUCTURE_GUIDE.md`
+
+### Backend changes
+
+- backend settings now load `Backend/.env` when present
+- Alembic now loads the same `Backend/.env` before reading `DATABASE_URL`
+- `.env` values now override any existing process env vars when present
+- added a local `.env` template with default dev values
+
+### Route or schema impact
+
+- no route or schema changes
+
+### Migration impact
+
+- no migration required
+- Alembic now reads `DATABASE_URL` from `Backend/.env` when present
+
+### How to test
+
+1. Edit `Backend/.env` with your local PostgreSQL password.
+2. Run `alembic upgrade head` and confirm it connects without exporting `DATABASE_URL` in the shell.
+3. Start `uvicorn app.main:app --reload` and confirm `GET /health` succeeds.
+
 ## 2026-03-17 - Sync Campus Admin status with school lockout
 
 ### Purpose

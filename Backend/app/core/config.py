@@ -1,4 +1,14 @@
 import os
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - optional in runtime envs
+    load_dotenv = None
+
+if load_dotenv is not None:
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    load_dotenv(env_path, override=True)
 from dataclasses import dataclass
 
 

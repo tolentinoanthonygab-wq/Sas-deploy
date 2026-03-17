@@ -7,7 +7,17 @@ from alembic import context
 
 import os
 import sys
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - optional in runtime envs
+    load_dotenv = None
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+if load_dotenv is not None:
+    env_path = Path(__file__).resolve().parents[1] / ".env"
+    load_dotenv(env_path, override=True)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
