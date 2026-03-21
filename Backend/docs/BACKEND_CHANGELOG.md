@@ -629,7 +629,6 @@ Made the backend easier to read by adding short, basic-English module comments t
 ### How to test
 
 - run `python -m compileall Backend/app Backend/alembic Backend/migrations Backend/seed.py Backend/run_simple_test.py Backend/migration_script.py`
->>>>>>> e8ab65c (Document backend modules and clean up unused face and geolocation helpers)
 
 ## 2026-03-17 - Sync Campus Admin status with school lockout
 
