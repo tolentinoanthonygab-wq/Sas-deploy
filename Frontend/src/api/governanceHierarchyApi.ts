@@ -214,6 +214,32 @@ export interface GovernanceAccessibleStudent {
   student_profile: GovernanceStudentProfileSummary;
 }
 
+export interface GovernanceDashboardAnnouncementSummary {
+  id: number;
+  title: string;
+  status: GovernanceAnnouncementStatus;
+  author_name?: string | null;
+  updated_at: string;
+}
+
+export interface GovernanceDashboardChildUnitSummary {
+  id: number;
+  unit_code: string;
+  unit_name: string;
+  description?: string | null;
+  unit_type: GovernanceUnitType;
+  member_count: number;
+}
+
+export interface GovernanceDashboardOverview {
+  governance_unit_id: number;
+  unit_type: GovernanceUnitType;
+  published_announcement_count: number;
+  total_students: number;
+  recent_announcements: GovernanceDashboardAnnouncementSummary[];
+  child_units: GovernanceDashboardChildUnitSummary[];
+}
+
 export interface GovernanceEventDefaults {
   governance_unit_id: number;
   school_id: number;
@@ -305,6 +331,21 @@ export const fetchGovernanceUnitDetails = async (
 
   if (!response.ok) throw new Error(await parseError(response, "Failed to fetch governance unit details"));
   return (await response.json()) as GovernanceUnitDetail;
+};
+
+export const fetchGovernanceDashboardOverview = async (
+  governanceUnitId: number
+): Promise<GovernanceDashboardOverview> => {
+  const response = await fetch(
+    buildApiUrl(`/api/governance/units/${governanceUnitId}/dashboard-overview`),
+    {
+      method: "GET",
+      headers: withAuthHeaders(),
+    }
+  );
+
+  if (!response.ok) throw new Error(await parseError(response, "Failed to fetch governance dashboard overview"));
+  return (await response.json()) as GovernanceDashboardOverview;
 };
 
 export const fetchGovernanceEventDefaults = async (
@@ -428,6 +469,8 @@ export const searchGovernanceStudentCandidates = async (params: {
 
 export const fetchAccessibleGovernanceStudents = async (params: {
   governance_context?: GovernanceUnitType;
+  skip?: number;
+  limit?: number;
 } = {}): Promise<GovernanceAccessibleStudent[]> => {
   const query = toQuery(params);
   const response = await fetch(buildApiUrl(`/api/governance/students${query ? `?${query}` : ""}`), {

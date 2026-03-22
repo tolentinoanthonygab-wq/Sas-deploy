@@ -1,21 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
-  fetchAccessibleGovernanceStudents,
-  fetchGovernanceAnnouncements,
-  fetchGovernanceUnitDetails,
-  fetchGovernanceUnits,
-  GovernanceAnnouncementItem,
-  GovernanceUnitDetail,
+  fetchGovernanceDashboardOverview,
+  GovernanceDashboardOverview,
 } from "../api/governanceHierarchyApi";
 import NavbarSSG from "../components/NavbarSSG";
 import "../css/SsgWorkspace.css";
 import { useSsgWorkspace } from "../hooks/useSsgWorkspace";
 import { formatDateLabel, toStatusToneClass } from "../utils/ssgWorkspaceHelpers";
-
-const sortUnits = (units: GovernanceUnitDetail[]) =>
-  [...units].sort((left, right) => left.unit_name.localeCompare(right.unit_name));
 
 const SSGDashboard = () => {
   const {
@@ -27,17 +20,16 @@ const SSGDashboard = () => {
     workspaceError,
     workspaceLoading,
   } = useSsgWorkspace();
-  const [sgUnits, setSgUnits] = useState<GovernanceUnitDetail[]>([]);
-  const [totalStudents, setTotalStudents] = useState(0);
-  const [announcements, setAnnouncements] = useState<GovernanceAnnouncementItem[]>([]);
+  const [overview, setOverview] = useState<GovernanceDashboardOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const canViewStudents = hasPermission("view_students") || hasPermission("manage_students");
-  const canManageAnnouncements = hasPermission("manage_announcements");
 
   useEffect(() => {
     if (accessLoading || !ssgAccessUnit) {
-      if (!accessLoading) setLoading(false);
+      if (!accessLoading) {
+        setOverview(null);
+        setLoading(false);
+      }
       return;
     }
 
@@ -45,23 +37,10 @@ const SSGDashboard = () => {
     setLoading(true);
     setError(null);
 
-    Promise.all([
-      fetchGovernanceUnits({
-        unit_type: "SG",
-        parent_unit_id: ssgAccessUnit.governance_unit_id,
-      }).then((units) =>
-        Promise.all(units.map((unit) => fetchGovernanceUnitDetails(unit.id))).then(sortUnits)
-      ),
-      canManageAnnouncements
-        ? fetchGovernanceAnnouncements(ssgAccessUnit.governance_unit_id)
-        : Promise.resolve<GovernanceAnnouncementItem[]>([]),
-      canViewStudents ? fetchAccessibleGovernanceStudents() : Promise.resolve(null),
-    ])
-      .then(([units, announcementItems, students]) => {
+    fetchGovernanceDashboardOverview(ssgAccessUnit.governance_unit_id)
+      .then((dashboardOverview) => {
         if (!isMounted) return;
-        setSgUnits(units);
-        setAnnouncements(announcementItems);
-        setTotalStudents(students?.length ?? 0);
+        setOverview(dashboardOverview);
       })
       .catch((requestError) => {
         if (!isMounted) return;
@@ -77,15 +56,13 @@ const SSGDashboard = () => {
     return () => {
       isMounted = false;
     };
-  }, [
-    accessLoading,
-    canManageAnnouncements,
-    canViewStudents,
-    ssgAccessUnit?.governance_unit_id,
-  ]);
+  }, [accessLoading, ssgAccessUnit?.governance_unit_id]);
 
-  const publishedCount = announcements.filter((item) => item.status === "published").length;
-  const recentAnnouncements = useMemo(() => announcements.slice(0, 5), [announcements]);
+  const canViewStudents = hasPermission("view_students") || hasPermission("manage_students");
+  const publishedCount = overview?.published_announcement_count ?? 0;
+  const recentAnnouncements = overview?.recent_announcements ?? [];
+  const sgUnits = overview?.child_units ?? [];
+  const totalStudents = overview?.total_students ?? 0;
   const canManageSg =
     hasPermission("create_sg") || hasPermission("manage_members") || hasPermission("assign_permissions");
 
@@ -217,9 +194,9 @@ const SSGDashboard = () => {
                         {unit.unit_code} - {unit.unit_name}
                       </strong>
                       <span>{unit.description || "Department-wide SG unit"}</span>
-                      <small>{unit.members.length} member(s)</small>
+                      <small>{unit.member_count} member(s)</small>
                     </div>
-                    <span className="ssg-badge ssg-badge--member">{unit.members.length}</span>
+                    <span className="ssg-badge ssg-badge--member">{unit.member_count}</span>
                   </div>
                 ))}
               </div>

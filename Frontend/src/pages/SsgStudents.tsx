@@ -3,6 +3,7 @@ import { FaArrowLeft } from "react-icons/fa";
 
 import {
   fetchAccessibleGovernanceStudents,
+  fetchGovernanceDashboardOverview,
   fetchGovernanceStudentNote,
   GovernanceAccessibleStudent,
   saveGovernanceStudentNote,
@@ -21,6 +22,8 @@ interface StudentNotesState {
   notes: string;
 }
 
+const STUDENTS_PAGE_SIZE = 25;
+
 const SsgStudents = () => {
   const { campusName, hasPermission, ssgAccessUnit } = useSsgWorkspace();
   const canManageStudents = hasPermission("manage_students");
@@ -32,33 +35,76 @@ const SsgStudents = () => {
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [yearFilter, setYearFilter] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [requestedPage, setRequestedPage] = useState<number | null>(null);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
-    setLoading(true);
-    setError(null);
+    if (!ssgAccessUnit) {
+      setTotalStudents(0);
+      return;
+    }
 
-    fetchAccessibleGovernanceStudents()
-      .then((users) => {
+    let isMounted = true;
+
+    fetchGovernanceDashboardOverview(ssgAccessUnit.governance_unit_id)
+      .then((overview) => {
         if (!isMounted) return;
-        setStudents(users.filter((user) => Boolean(user.student_profile)));
+        setTotalStudents(overview.total_students);
       })
       .catch((requestError) => {
         if (!isMounted) return;
         setError(
-          requestError instanceof Error ? requestError.message : "Failed to load campus students"
+          requestError instanceof Error ? requestError.message : "Failed to load the student directory overview"
         );
-      })
-      .finally(() => {
-        if (!isMounted) return;
-        setLoading(false);
       });
 
     return () => {
       isMounted = false;
     };
+  }, [ssgAccessUnit?.governance_unit_id]);
+
+  const loadStudentsPage = async (pageIndex: number) => {
+    const safePageIndex = Math.max(pageIndex, 0);
+    setRequestedPage(safePageIndex);
+    if (!loading) {
+      setIsRefreshing(true);
+    }
+
+    try {
+      setError(null);
+      const users = await fetchAccessibleGovernanceStudents({
+        skip: safePageIndex * STUDENTS_PAGE_SIZE,
+        limit: STUDENTS_PAGE_SIZE,
+      });
+      const pagedStudents = users.filter((user) => Boolean(user.student_profile));
+
+      if (safePageIndex > 0 && pagedStudents.length === 0) {
+        await loadStudentsPage(safePageIndex - 1);
+        return;
+      }
+
+      setStudents(pagedStudents);
+      setCurrentPage(safePageIndex);
+      setHasNextPage(pagedStudents.length === STUDENTS_PAGE_SIZE);
+      setLoading(false);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "Failed to load campus students"
+      );
+      setLoading(false);
+    } finally {
+      setRequestedPage(null);
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadStudentsPage(0);
   }, []);
 
   useEffect(() => {
@@ -138,6 +184,11 @@ const SsgStudents = () => {
   }, [departmentFilter, search, students, yearFilter]);
 
   const totalDepartments = departments.length;
+  const hasActiveFilters = Boolean(search.trim() || departmentFilter || yearFilter);
+  const visibleTotalStudents = totalStudents > 0 ? totalStudents : students.length;
+  const pageStart = students.length === 0 ? 0 : currentPage * STUDENTS_PAGE_SIZE + 1;
+  const pageEnd = currentPage * STUDENTS_PAGE_SIZE + students.length;
+  const displayedPageNumber = (requestedPage ?? currentPage) + 1;
 
   const handleTagKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== "Enter") return;
@@ -206,18 +257,18 @@ const SsgStudents = () => {
         <section className="ssg-stat-grid">
           <article className="ssg-stat-card">
             <span className="ssg-stat-card__label">Total Students</span>
-            <strong className="ssg-stat-card__value">{students.length}</strong>
+            <strong className="ssg-stat-card__value">{visibleTotalStudents}</strong>
             <span className="ssg-stat-card__hint">Imported student accounts in campus scope</span>
           </article>
           <article className="ssg-stat-card">
-            <span className="ssg-stat-card__label">Departments</span>
+            <span className="ssg-stat-card__label">Departments on Page</span>
             <strong className="ssg-stat-card__value">{totalDepartments}</strong>
-            <span className="ssg-stat-card__hint">Department groups represented in this list</span>
+            <span className="ssg-stat-card__hint">Department groups represented in the loaded backend page</span>
           </article>
           <article className="ssg-stat-card">
-            <span className="ssg-stat-card__label">Filtered Results</span>
+            <span className="ssg-stat-card__label">Filtered Page Results</span>
             <strong className="ssg-stat-card__value">{filteredStudents.length}</strong>
-            <span className="ssg-stat-card__hint">Students matching the active search and filters</span>
+            <span className="ssg-stat-card__hint">Search and filters apply to the current backend page only</span>
           </article>
           <article className="ssg-stat-card">
             <span className="ssg-stat-card__label">Access Level</span>
@@ -270,6 +321,9 @@ const SsgStudents = () => {
               </select>
             </div>
           </div>
+          <p className="ssg-pagination-note">
+            Search and filters stay on the current backend page so the campus directory loads faster.
+          </p>
         </section>
 
         {loading ? (
@@ -373,8 +427,16 @@ const SsgStudents = () => {
               </section>
             </div>
           </section>
+        ) : error && students.length === 0 ? (
+          <div className="ssg-empty-state">The campus student directory could not be loaded right now.</div>
+        ) : students.length === 0 ? (
+          <div className="ssg-empty-state">No imported students are available in the campus scope yet.</div>
         ) : filteredStudents.length === 0 ? (
-          <div className="ssg-empty-state">No students matched the current filters.</div>
+          <div className="ssg-empty-state">
+            {hasActiveFilters
+              ? "No students matched the current filters on this page."
+              : "This backend page has no students to display."}
+          </div>
         ) : (
           <div className="ssg-table-wrap">
             <table className="ssg-data-table">
@@ -425,6 +487,41 @@ const SsgStudents = () => {
               </tbody>
             </table>
           </div>
+        )}
+
+        {!selectedStudent && (students.length > 0 || currentPage > 0) && (
+          <section className="ssg-pagination">
+            <div className="ssg-pagination__summary">
+              {isRefreshing
+                ? `Loading page ${displayedPageNumber}...`
+                : students.length === 0
+                  ? `Page ${currentPage + 1} has no students.`
+                  : totalStudents > 0
+                    ? `Showing ${pageStart}-${pageEnd} of ${totalStudents} students on page ${currentPage + 1}`
+                    : `Showing ${pageStart}-${pageEnd} students on page ${currentPage + 1}`}
+            </div>
+            <div className="ssg-pagination__controls">
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={() => void loadStudentsPage(currentPage - 1)}
+                disabled={currentPage === 0 || isRefreshing}
+              >
+                Previous
+              </button>
+              <span className="ssg-pagination__page-indicator">
+                {isRefreshing ? `Page ${displayedPageNumber}` : `Page ${currentPage + 1}`}
+              </span>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void loadStudentsPage(currentPage + 1)}
+                disabled={!hasNextPage || isRefreshing}
+              >
+                Next
+              </button>
+            </div>
+          </section>
         )}
       </main>
     </div>
